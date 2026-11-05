@@ -5,3 +5,6 @@ django-cors-headers
 mysqlclient
 python-dotenv
 Pillow
+dj-database-url
+psycopg[binary]
+gunicorn
