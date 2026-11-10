@@ -1,6 +1,9 @@
 from django.db import models
 from courses.models import Course
-
+from cloudinary_storage.storage import (
+    VideoMediaCloudinaryStorage,
+    RawMediaCloudinaryStorage,
+)
 
 class Lesson(models.Model):
 
@@ -28,13 +31,14 @@ class Lesson(models.Model):
     content = models.TextField(blank=True)
 
     video_file = models.FileField(
-        upload_to="lessons/videos/",
-        null=True,
-        blank=True
+          upload_to="lessons/videos/",
+          storage=VideoMediaCloudinaryStorage(),
+          null=True,
+          blank=True
     )
-
     pdf_file = models.FileField(
         upload_to="lessons/pdfs/",
+        storage=RawMediaCloudinaryStorage(),
         null=True,
         blank=True
     )
