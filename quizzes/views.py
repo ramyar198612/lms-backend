@@ -30,16 +30,18 @@ class QuizListCreateView(generics.ListCreateAPIView):
     serializer_class = QuizSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    
     def get_queryset(self):
         user = self.request.user
         course_id = self.request.query_params.get("course")
 
-        if not course_id:
-            return Quiz.objects.none()
+        queryset = Quiz.objects.all().prefetch_related(
+            "questions__choices"
+        )
 
-        queryset = Quiz.objects.filter(
-            course_id=course_id
-        ).prefetch_related("questions__choices")
+        # If a course ID is supplied, filter by that course.
+        if course_id:
+            queryset = queryset.filter(course_id=course_id)
 
         if user.role == "ADMIN":
             return queryset
@@ -48,17 +50,16 @@ class QuizListCreateView(generics.ListCreateAPIView):
             return queryset.filter(course__trainer=user)
 
         if user.role == "STUDENT":
-            enrolled = Enrollment.objects.filter(
+            enrolled_course_ids = Enrollment.objects.filter(
                 student=user,
-                course_id=course_id,
                 status__in=["ACTIVE", "COMPLETED"]
-            ).exists()
+            ).values_list("course_id", flat=True)
 
-            if enrolled:
-                return queryset.filter(
-                    course__is_published=True,
-                    is_published=True
-                )
+            return queryset.filter(
+                course_id__in=enrolled_course_ids,
+                course__is_published=True,
+                is_published=True
+            )
 
         return Quiz.objects.none()
 
