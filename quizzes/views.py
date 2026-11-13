@@ -308,11 +308,13 @@ class QuizSubmitView(APIView):
         attempt.save()
 
         return Response({
-            "message": "Quiz submitted successfully.",
-            "score": score,
-            "total_marks": attempt.total_marks,
-            "passed": attempt.passed
-        })
+    "id": attempt.id,
+    "attempt_id": attempt.id,
+    "message": "Quiz submitted successfully.",
+    "score": score,
+    "total_marks": attempt.total_marks,
+    "passed": attempt.passed
+})
 
 
 
