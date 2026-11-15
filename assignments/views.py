@@ -1,3 +1,4 @@
+
 from django.utils import timezone
 from rest_framework import generics, permissions
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -13,7 +14,6 @@ from enrollments.models import Enrollment
 
 
 class AssignmentListCreateView(generics.ListCreateAPIView):
-
     serializer_class = AssignmentSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -25,19 +25,27 @@ class AssignmentListCreateView(generics.ListCreateAPIView):
             "course", "course__trainer"
         )
 
-        if not course_id:
-            return queryset.none()
-
         if user.role == "ADMIN":
-            return queryset.filter(course_id=course_id)
+            if course_id:
+                return queryset.filter(course_id=course_id)
+            return queryset
 
         if user.role == "TRAINER":
-            return queryset.filter(
-                course_id=course_id,
+            trainer_assignments = queryset.filter(
                 course__trainer=user
             )
 
+            if course_id:
+                return trainer_assignments.filter(
+                    course_id=course_id
+                )
+
+            return trainer_assignments
+
         if user.role == "STUDENT":
+            if not course_id:
+                return queryset.none()
+
             enrolled = Enrollment.objects.filter(
                 student=user,
                 course_id=course_id,
@@ -82,7 +90,6 @@ class AssignmentListCreateView(generics.ListCreateAPIView):
 
 
 class AssignmentDetailView(generics.RetrieveUpdateDestroyAPIView):
-
     serializer_class = AssignmentSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -125,7 +132,6 @@ class AssignmentDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class AssignmentSubmissionCreateView(generics.CreateAPIView):
-
     serializer_class = AssignmentSubmissionSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -160,9 +166,14 @@ class AssignmentSubmissionCreateView(generics.CreateAPIView):
             )
 
         if assignment.due_date and timezone.now() > assignment.due_date:
-            raise ValidationError("Assignment submission deadline has passed.")
+            raise ValidationError(
+                "Assignment submission deadline has passed."
+            )
 
-        if not self.request.data.get("answer_text") and not self.request.FILES.get("submission_file"):
+        if (
+            not self.request.data.get("answer_text")
+            and not self.request.FILES.get("submission_file")
+        ):
             raise ValidationError(
                 "Provide an answer or upload a submission file."
             )
@@ -182,7 +193,6 @@ class AssignmentSubmissionCreateView(generics.CreateAPIView):
 
 
 class MySubmissionsView(generics.ListAPIView):
-
     serializer_class = AssignmentSubmissionSerializer
     permission_classes = [permissions.IsAuthenticated]
 
@@ -206,10 +216,9 @@ class MySubmissionsView(generics.ListAPIView):
 
         return AssignmentSubmission.objects.none()
 
+
 class SubmissionReviewView(generics.UpdateAPIView):
-
     serializer_class = SubmissionReviewSerializer
-
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
@@ -235,7 +244,10 @@ class SubmissionReviewView(generics.UpdateAPIView):
 
         submission = self.get_object()
 
-        if user.role == "TRAINER" and submission.assignment.course.trainer_id != user.id:
+        if (
+            user.role == "TRAINER"
+            and submission.assignment.course.trainer_id != user.id
+        ):
             raise PermissionDenied(
                 "You cannot review submissions for another trainer's course."
             )
