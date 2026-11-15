@@ -25,11 +25,13 @@ class AssignmentListCreateView(generics.ListCreateAPIView):
             "course", "course__trainer"
         )
 
+        # Administrator can see all assignments.
         if user.role == "ADMIN":
             if course_id:
                 return queryset.filter(course_id=course_id)
             return queryset
 
+        # Trainer can see assignments belonging to their courses.
         if user.role == "TRAINER":
             trainer_assignments = queryset.filter(
                 course__trainer=user
@@ -42,22 +44,21 @@ class AssignmentListCreateView(generics.ListCreateAPIView):
 
             return trainer_assignments
 
+        # Student can see published assignments from all enrolled courses.
         if user.role == "STUDENT":
-            if not course_id:
-                return queryset.none()
+            student_assignments = queryset.filter(
+                course__is_published=True,
+                is_published=True,
+                course__enrollments__student=user,
+                course__enrollments__status__in=["ACTIVE", "COMPLETED"]
+            ).distinct()
 
-            enrolled = Enrollment.objects.filter(
-                student=user,
-                course_id=course_id,
-                status__in=["ACTIVE", "COMPLETED"]
-            ).exists()
-
-            if enrolled:
-                return queryset.filter(
-                    course_id=course_id,
-                    course__is_published=True,
-                    is_published=True
+            if course_id:
+                return student_assignments.filter(
+                    course_id=course_id
                 )
+
+            return student_assignments
 
         return queryset.none()
 
