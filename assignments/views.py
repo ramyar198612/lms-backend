@@ -11,7 +11,7 @@ from .serializers import (
 )
 from courses.models import Course
 from enrollments.models import Enrollment
-
+from notifications.models import Notification
 
 class AssignmentListCreateView(generics.ListCreateAPIView):
     serializer_class = AssignmentSerializer
@@ -275,4 +275,15 @@ class SubmissionReviewView(generics.UpdateAPIView):
             status=AssignmentSubmission.Status.REVIEWED,
             marks_obtained=marks,
             feedback=feedback
+        )
+        Notification.objects.create(
+            recipient=submission.student,
+            title="Assignment Evaluated",
+            message=(
+                f"Your assignment '{submission.assignment.title}' "
+                f"has been evaluated. Marks: {marks}/"
+                f"{submission.assignment.total_marks}. "
+                f"Feedback: {feedback or 'No feedback provided.'}"
+            ),
+            notification_type=Notification.NotificationType.ASSIGNMENT
         )

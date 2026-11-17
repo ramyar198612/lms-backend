@@ -1,6 +1,6 @@
 
 from django.shortcuts import get_object_or_404
-from rest_framework import generics, status
+from rest_framework import generics
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -73,6 +73,7 @@ def send_announcement_notifications(announcement):
 
     Notification.objects.bulk_create(notifications)
 
+
 class AnnouncementListCreateView(generics.ListCreateAPIView):
     serializer_class = AnnouncementSerializer
     permission_classes = [IsAuthenticated]
@@ -103,30 +104,29 @@ class AnnouncementListCreateView(generics.ListCreateAPIView):
 
         raise PermissionDenied("You do not have permission.")
 
-    
-def perform_create(self, serializer):
-    user = self.request.user
-    course_id = self.request.data.get("course")
+    def perform_create(self, serializer):
+        user = self.request.user
+        course_id = self.request.data.get("course")
 
-    if user.role not in ["ADMIN", "TRAINER"]:
-        raise PermissionDenied(
-            "Only trainers and administrators can create announcements."
+        if user.role not in ["ADMIN", "TRAINER"]:
+            raise PermissionDenied(
+                "Only trainers and administrators can create announcements."
+            )
+
+        course = get_object_or_404(Course, id=course_id)
+
+        if user.role == "TRAINER" and course.trainer_id != user.id:
+            raise PermissionDenied(
+                "You can only announce in your own courses."
+            )
+
+        announcement = serializer.save(
+            course=course,
+            created_by=user
         )
 
-    course = get_object_or_404(Course, id=course_id)
-
-    if user.role == "TRAINER" and course.trainer_id != user.id:
-        raise PermissionDenied(
-            "You can only announce in your own courses."
-        )
-
-    announcement = serializer.save(
-        course=course,
-        created_by=user
-    )
-
-    if announcement.is_published:
-        send_announcement_notifications(announcement)
+        if announcement.is_published:
+            send_announcement_notifications(announcement)
 
 
 class AnnouncementDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -157,30 +157,27 @@ class AnnouncementDetailView(generics.RetrieveUpdateDestroyAPIView):
 
         return Announcement.objects.none()
 
-   
-def update(self, request, *args, **kwargs):
-    if request.user.role not in ["ADMIN", "TRAINER"]:
-        raise PermissionDenied(
-            "Only trainers and administrators can update announcements."
-        )
+    def update(self, request, *args, **kwargs):
+        if request.user.role not in ["ADMIN", "TRAINER"]:
+            raise PermissionDenied(
+                "Only trainers and administrators can update announcements."
+            )
 
-    if "course" in request.data:
-        raise ValidationError(
-            "An announcement cannot be moved to another course."
-        )
+        if "course" in request.data:
+            raise ValidationError(
+                "An announcement cannot be moved to another course."
+            )
 
-    return super().update(request, *args, **kwargs)
+        return super().update(request, *args, **kwargs)
 
+    def perform_update(self, serializer):
+        announcement = self.get_object()
+        was_published = announcement.is_published
 
-def perform_update(self, serializer):
-    announcement = self.get_object()
-    was_published = announcement.is_published
+        updated_announcement = serializer.save()
 
-    updated_announcement = serializer.save()
-
-    if not was_published and updated_announcement.is_published:
-        send_announcement_notifications(updated_announcement)
-
+        if not was_published and updated_announcement.is_published:
+            send_announcement_notifications(updated_announcement)
 
     def destroy(self, request, *args, **kwargs):
         if request.user.role not in ["ADMIN", "TRAINER"]:
